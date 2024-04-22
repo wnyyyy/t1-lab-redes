@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 pub enum MessageType {
     Text = 0,
     File = 1,
+    ListClients = 2,
 }
 impl From<MessageType> for u8 {
     fn from(message_type: MessageType) -> Self {
@@ -18,6 +19,7 @@ impl TryFrom<u8> for MessageType {
         match value {
             0 => Ok(MessageType::Text),
             1 => Ok(MessageType::File),
+            2 => Ok(MessageType::ListClients),
             _ => Err("Tipo de mensagem inválido".to_string()),
         }
     }

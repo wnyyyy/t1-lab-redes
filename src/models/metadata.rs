@@ -6,7 +6,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::utilities::enums::MessageType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MsgMetadata {
     pub sender_id: u16,
     pub receiver_id: u16,

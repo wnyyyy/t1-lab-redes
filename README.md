@@ -1,5 +1,5 @@
 Formato das mensagens (em 8 bits)
-[0, 1] -> placeholder
+[0, 1] -> sender_id
 [2, 3] -> receiver_id
 [4, 11] -> timestamp
 12 -> message_type
