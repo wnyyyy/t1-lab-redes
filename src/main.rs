@@ -4,6 +4,7 @@ use std::io::stdin;
 use t1_lab_redes::config::{HOST_ADDRESS, TCP_PORT};
 use t1_lab_redes::models::message::Message;
 use t1_lab_redes::models::metadata::MsgMetadata;
+use t1_lab_redes::network::client;
 use t1_lab_redes::network::{client::Client, server::Server};
 use t1_lab_redes::utilities::enums::MessageType;
 
@@ -19,8 +20,15 @@ async fn main() {
         Some("client") => {
             if let Some(arg) = args.get(2) {
                 if arg == "udp" {
-                    eprintln!("Cliente UDP não implementado.");
-                    return;
+                    loop {
+                        print!("Mensagem");
+                        let mut content_str = String::new();
+                        stdin().read_line(&mut content_str).unwrap();
+                        let content = content_str.trim().to_string().as_bytes().to_vec();
+                        println!("id");
+                        let mut id_str = String::new();
+                        stdin().read_line(&mut id_str).unwrap();
+                    }
                 }
             }
             else {
