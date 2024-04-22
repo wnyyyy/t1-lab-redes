@@ -1,10 +1,10 @@
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use bimap::BiMap;
 use tokio::io::AsyncWriteExt;
-use tokio::net::unix::SocketAddr;
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task;
@@ -111,8 +111,8 @@ impl Server {
                             .get_by_right(&sender_addr)
                             .unwrap();
                         let id_table = id_table_clone.write().await;
-                        let name_table = name_table_clone.write().await;
-                        Self::process_message(&mut message, &id_table, name_table).await
+                        let mut name_table = name_table_clone.write().await;
+                        Self::process_message(&mut message, &id_table, &mut name_table).await
                     };
 
                     let dest_client_addr = {
@@ -176,9 +176,13 @@ impl Server {
             }
             MessageType::SetName => {
                 let client_id = message.metadata.sender_id;
-                let client_name = String::from_utf8_lossy(&message.content).to_string();
-                name_table.insert(client_id, client_name.clone());
-                println!("Clientes conectados: {}", content);
+                let client_name = String::from_utf8_lossy(&message.content).trim().to_string();
+                let success = !name_table.values().any(|name| name == &client_name);
+                if success {
+                    name_table.insert(client_id, client_name.clone());
+                }
+                println!("Clientes ID {0} - Novo nome: {1}", client_id, client_name);
+                let message = Message::new_set_name(client_id, success);
                 message.clone()
             }
         }

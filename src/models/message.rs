@@ -47,6 +47,22 @@ impl Message {
         }
     }
 
+    pub fn new_set_name(sender_id: u16, success: bool) -> Message {
+        let timestamp = Utc::now();
+        let content_bytes = success.to_string().as_bytes().to_vec();
+        let metadata = MsgMetadata::new(
+            sender_id,
+            sender_id,
+            timestamp,
+            MessageType::SetName,
+            content_bytes.len() as u64,
+        );
+        Message {
+            metadata,
+            content: content_bytes,
+        }
+    }
+
     pub async fn serialize(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend(self.metadata.serialize().await.unwrap());
