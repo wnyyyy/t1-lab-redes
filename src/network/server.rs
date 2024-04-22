@@ -17,6 +17,7 @@ pub struct Server {
     tcp_clients: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
     id_table: Arc<RwLock<BiMap<u16, String>>>,
     name_table: Arc<RwLock<HashMap<u16, String>>>,
+    udp_id_map: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
 }
 
 impl Server {
@@ -25,6 +26,7 @@ impl Server {
             tcp_clients: Arc::new(RwLock::new(HashMap::new())),
             id_table: Arc::new(RwLock::new(BiMap::new())),
             name_table: Arc::new(RwLock::new(HashMap::new())),
+            udp_id_map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -110,7 +112,7 @@ impl Server {
                             .unwrap();
                         let mut id_table = id_table_clone.write().await;
                         let mut name_table = name_table_clone.write().await;
-                        Self::process_message(&mut message, &mut id_table, &mut name_table).await
+                        Self::process_message(&mut message, &mut id_table, &mut name_table, None).await
                     };
 
                     let dest_client_addr = {
@@ -152,6 +154,7 @@ impl Server {
         message: &mut Message,
         id_table: &mut BiMap<u16, String>,
         name_table: &mut HashMap<u16, String>,
+        udp_id: Option<u16>,
     ) -> Message {
         match message.metadata.message_type {
             MessageType::File | MessageType::Text => {
@@ -170,7 +173,7 @@ impl Server {
                     };
                     clients.push((id, name));
                 }
-                Message::new_list_clients(message.metadata.sender_id, clients)
+                Message::new_list_clients(message.metadata.sender_id, clients, udp_id)
             }
             MessageType::SetName => {
                 let client_id = message.metadata.sender_id;
@@ -180,7 +183,7 @@ impl Server {
                     name_table.insert(client_id, client_name.clone());
                 }
                 println!("Clientes ID {0} - Novo nome: {1}", client_id, client_name);
-                let message = Message::new_set_name(client_id, success);
+                let message = Message::new_set_name(client_id, success, udp_id);
                 message.clone()
             }
             MessageType::Disconnect => {
@@ -191,14 +194,6 @@ impl Server {
                 message.clone()
             }
         }
-    }
-
-    fn build_client_list(id_table: &BiMap<u16, String>) -> String {
-        let mut client_list = String::new();
-        for (id, addr) in id_table.iter() {
-            client_list.push_str(&format!("ID: {0} - {1}\n", id, addr));
-        }
-        client_list
     }
 
     async fn listen_udp(socket: UdpSocket,
@@ -225,6 +220,7 @@ impl Server {
                     }
                 }
             };
+            println!("Recebendo dados UDP de {0} - ID {1}", addr, id);
             let mut id_table_write = id_table.write().await;
         }
     }

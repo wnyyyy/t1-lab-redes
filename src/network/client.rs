@@ -17,7 +17,7 @@ impl Client {
     }
 
     pub async fn send_text(&mut self, content: String, destination_id: u16) -> io::Result<()> {
-        let message = Message::new_text(destination_id, content);
+        let message = Message::new_text(destination_id, content, None);
         let message_bytes = message.serialize().await;
         self.stream.write_all(&message_bytes).await
     }

@@ -13,6 +13,7 @@ pub struct MsgMetadata {
     pub timestamp: DateTime<Utc>,
     pub message_type: MessageType,
     pub message_length: u64,
+    pub udp_id: Option<u16>
 }
 
 impl MsgMetadata {
@@ -22,6 +23,7 @@ impl MsgMetadata {
         timestamp: DateTime<Utc>,
         message_type: MessageType,
         message_length: u64,
+        udp_id: Option<u16>,        
     ) -> MsgMetadata {
         MsgMetadata {
             sender_id,
@@ -29,6 +31,7 @@ impl MsgMetadata {
             timestamp,
             message_type,
             message_length,
+            udp_id,
         }
     }
 
@@ -48,10 +51,15 @@ impl MsgMetadata {
         let message_length_bytes = self.message_length.to_le_bytes();
         bytes.write_all(&message_length_bytes).await?;
 
+        if let Some(udp_id) = self.udp_id {
+            let udp_id_bytes = udp_id.to_le_bytes();
+            bytes.write_all(&udp_id_bytes).await?;
+        }
+
         Ok(bytes)
     }
 
-    pub fn deserialize(data: &[u8]) -> Result<MsgMetadata, Error> {
+    pub fn deserialize(data: &[u8], is_udp: bool) -> Result<MsgMetadata, Error> {
         let sender_id = u16::from_le_bytes(data[0..2].try_into().unwrap());
 
         let receiver_id = u16::from_le_bytes(data[2..4].try_into().unwrap());
@@ -86,7 +94,7 @@ impl MsgMetadata {
             }
         };
 
-        let message_length = match data[13..].try_into() {
+        let message_length = match data[13..21].try_into() {
             Ok(bytes) => u64::from_le_bytes(bytes),
             Err(_) => {
                 return Err(Error::new(
@@ -96,12 +104,35 @@ impl MsgMetadata {
             }
         };
 
+        let udp_id = {
+            if is_udp == false {
+                return Ok(MsgMetadata {
+                    sender_id,
+                    receiver_id,
+                    timestamp,
+                    message_type,
+                    message_length,
+                    udp_id: None
+                })
+            }
+            match data[21..23].try_into() {
+                Ok(bytes) => Some(u16::from_le_bytes(bytes)),
+                Err(_) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "ID UDP inválido",
+                    ))
+                }
+            }
+        };
+
         Ok(MsgMetadata {
             sender_id,
             receiver_id,
             timestamp,
             message_type,
             message_length,
+            udp_id
         })
     }
 

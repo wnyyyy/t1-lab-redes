@@ -14,7 +14,7 @@ impl Message {
         Message { metadata, content }
     }
 
-    pub fn new_text(receiver_id: u16, content: String) -> Message {
+    pub fn new_text(receiver_id: u16, content: String, udp_id: Option<u16>) -> Message {
         let content_bytes = content.as_bytes().to_vec();
         let timestamp = Utc::now();
         let metadata = MsgMetadata::new(
@@ -23,6 +23,7 @@ impl Message {
             timestamp,
             MessageType::Text,
             content_bytes.len() as u64,
+            udp_id,
         );
         Message {
             metadata,
@@ -30,7 +31,7 @@ impl Message {
         }
     }
 
-    pub fn new_list_clients(sender_id: u16, clients: Vec<(u16, String)>) -> Message {
+    pub fn new_list_clients(sender_id: u16, clients: Vec<(u16, String)>, udp_id: Option<u16>) -> Message {
         let timestamp = Utc::now();
         let content_json = serde_json::to_string(&clients).unwrap();
         let content_bytes = content_json.as_bytes().to_vec();
@@ -40,6 +41,7 @@ impl Message {
             timestamp,
             MessageType::ListClients,
             content_bytes.len() as u64,
+            udp_id,
         );
         Message {
             metadata,
@@ -47,7 +49,7 @@ impl Message {
         }
     }
 
-    pub fn new_set_name(sender_id: u16, success: bool) -> Message {
+    pub fn new_set_name(sender_id: u16, success: bool, udp_id: Option<u16>) -> Message {
         let timestamp = Utc::now();
         let content_bytes = success.to_string().as_bytes().to_vec();
         let metadata = MsgMetadata::new(
@@ -56,6 +58,7 @@ impl Message {
             timestamp,
             MessageType::SetName,
             content_bytes.len() as u64,
+            udp_id,
         );
         Message {
             metadata,

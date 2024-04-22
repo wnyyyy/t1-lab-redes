@@ -1,7 +1,6 @@
 use std::env;
 use std::io::stdin;
 
-use chrono::DateTime;
 use t1_lab_redes::config::{HOST_ADDRESS, TCP_PORT};
 use t1_lab_redes::models::message::Message;
 use t1_lab_redes::models::metadata::MsgMetadata;
@@ -34,7 +33,7 @@ async fn main() {
                 stdin().read_line(&mut tipo_str).unwrap();
                 let tipo = MessageType::try_from(tipo_str.trim().parse::<u8>().unwrap()).unwrap();
                 let timestamp = chrono::Utc::now();
-                let metadata = MsgMetadata::new(id, id, timestamp, tipo, content.len() as u64);
+                let metadata = MsgMetadata::new(id, id, timestamp, tipo, content.len() as u64, None);
                 let message = Message::new(metadata, content);
                 client.send_raw(message).await.unwrap();
                 let response = client.receive().await.unwrap();
