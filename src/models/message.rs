@@ -1,3 +1,5 @@
+use std::fs::Metadata;
+
 use chrono::Utc;
 
 use crate::models::metadata::MsgMetadata;
@@ -66,10 +68,27 @@ impl Message {
         }
     }
 
+    pub fn new_udp_packet(data: Vec<u8>) -> Result<Message, String> {
+        let metadata = match MsgMetadata::deserialize(&data, true) {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                return Err(format!("Metadata inválida: \n{0}", e));
+            }
+        };
+        Ok(Message {
+            metadata,
+            content: data,
+        })
+    }
+
     pub async fn serialize(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend(self.metadata.serialize().await.unwrap());
         bytes.extend(&self.content);
         bytes
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.metadata.is_complete(self.content.len() as u64)
     }
 }

@@ -17,28 +17,36 @@ async fn main() {
             server.start().await;
         }
         Some("client") => {
-            let addr = format!("{}:{}", HOST_ADDRESS, TCP_PORT);
-            let mut client = Client::connect(addr).await.unwrap();
-            loop {
-                println!("Mensagem");
-                let mut content_str = String::new();
-                stdin().read_line(&mut content_str).unwrap();
-                let content = content_str.trim().to_string().as_bytes().to_vec();
-                println!("id");
-                let mut id_str = String::new();
-                stdin().read_line(&mut id_str).unwrap();            
-                let id = id_str.trim().parse().unwrap();
-                println!("tipo");
-                let mut tipo_str = String::new();
-                stdin().read_line(&mut tipo_str).unwrap();
-                let tipo = MessageType::try_from(tipo_str.trim().parse::<u8>().unwrap()).unwrap();
-                let timestamp = chrono::Utc::now();
-                let metadata = MsgMetadata::new(id, id, timestamp, tipo, content.len() as u64, None);
-                let message = Message::new(metadata, content);
-                client.send_raw(message).await.unwrap();
-                let response = client.receive().await.unwrap();
-                println!("Mensagem recebida: {}", response);
+            if let Some(arg) = args.get(2) {
+                if arg == "udp" {
+                    eprintln!("Cliente UDP não implementado.");
+                    return;
+                }
             }
+            else {
+                let addr = format!("{}:{}", HOST_ADDRESS, TCP_PORT);
+                let mut client = Client::connect(addr).await.unwrap();
+                loop {
+                    println!("Mensagem");
+                    let mut content_str = String::new();
+                    stdin().read_line(&mut content_str).unwrap();
+                    let content = content_str.trim().to_string().as_bytes().to_vec();
+                    println!("id");
+                    let mut id_str = String::new();
+                    stdin().read_line(&mut id_str).unwrap();            
+                    let id = id_str.trim().parse().unwrap();
+                    println!("tipo");
+                    let mut tipo_str = String::new();
+                    stdin().read_line(&mut tipo_str).unwrap();
+                    let tipo = MessageType::try_from(tipo_str.trim().parse::<u8>().unwrap()).unwrap();
+                    let timestamp = chrono::Utc::now();
+                    let metadata = MsgMetadata::new(id, id, timestamp, tipo, content.len() as u64, None);
+                    let message = Message::new(metadata, content);
+                    client.send_raw(message).await.unwrap();
+                    let response = client.receive().await.unwrap();
+                    println!("Mensagem recebida: {}", response);
+                }
+            }            
         }
         _ => {
             eprintln!("Usage: program [server|client]");

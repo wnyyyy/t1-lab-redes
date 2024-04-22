@@ -9,7 +9,7 @@ use tokio::task;
 
 use crate::config::{HOST_ADDRESS, TCP_PORT, UDP_PORT};
 use crate::models::message::Message;
-use crate::network::tcp;
+use crate::network::{tcp, udp};
 use crate::utilities::enums::MessageType;
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,7 @@ pub struct Server {
     id_table: Arc<RwLock<BiMap<u16, String>>>,
     name_table: Arc<RwLock<HashMap<u16, String>>>,
     udp_id_map: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
+    udp_data_map: Arc<RwLock<HashMap<u16, Vec<Message>>>>,
 }
 
 impl Server {
@@ -27,6 +28,7 @@ impl Server {
             id_table: Arc::new(RwLock::new(BiMap::new())),
             name_table: Arc::new(RwLock::new(HashMap::new())),
             udp_id_map: Arc::new(RwLock::new(HashMap::new())),
+            udp_data_map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -49,10 +51,11 @@ impl Server {
         });
 
         let id_table = self.id_table.clone();
-        let name_table = self.name_table.clone();
+        let udp_id_map = self.udp_id_map.clone();
+        let udp_data_map = self.udp_data_map.clone();
 
         let udp_task = task::spawn(async move {
-            Self::listen_udp(udp_socket, id_table.clone(), name_table.clone()).await;
+            Self::listen_udp(udp_socket, id_table.clone(), udp_id_map, udp_data_map).await;
         });
 
         let _ = tokio::join!(tcp_task, udp_task);
@@ -198,7 +201,9 @@ impl Server {
 
     async fn listen_udp(socket: UdpSocket,
         id_table: Arc<RwLock<BiMap<u16, String>>>,
-        name_table: Arc<RwLock<HashMap<u16, String>>>,) {
+        udp_id_map: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
+        udp_data_map: Arc<RwLock<HashMap<u16, Vec<Message>>>>,
+    ) {
         let mut buf = [0; 1024];
         loop {
             let (len, addr) = match socket.recv_from(&mut buf).await {
@@ -220,8 +225,12 @@ impl Server {
                     }
                 }
             };
+            let mut udp_id_map_read = udp_id_map.write().await;
+            let owned_ids = udp_id_map_read.entry(id).or_insert(Vec::new());
+            let mut udp_data_map_write = udp_data_map.write().await;
+            let current_packets = udp_data_map_write.entry(id).or_insert(Vec::new());
+            udp::build_udp_message(buf[..len].to_vec(), owned_ids.clone(), current_packets).await;
             println!("Recebendo dados UDP de {0} - ID {1}", addr, id);
-            let mut id_table_write = id_table.write().await;
         }
     }
 

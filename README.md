@@ -4,6 +4,7 @@ Formato das mensagens (em 8 bits)
 [4, 11] -> timestamp
 12 -> message_type
 [13, 20] -> message_length
+[21, 22] -> ID mensagem UDP (usado para construir mensagens por UDP)
 
 Tipos válidos
 Text = 0 - Envia mensagem de texto. Conteúdo da mensagem possui o texto a ser enviado.

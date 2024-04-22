@@ -142,4 +142,8 @@ impl MsgMetadata {
             self.sender_id, self.receiver_id, self.timestamp, self.message_type, self.message_length
         )
     }
+
+    pub(crate) fn is_complete(&self, content_size: u64) -> bool {
+        self.message_length == content_size
+    }
 }
