@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use bimap::BiMap;
 use tokio::io::AsyncWriteExt;
-use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::net::unix::SocketAddr;
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task;
 
@@ -110,7 +111,7 @@ impl Server {
                             .get_by_right(&sender_addr)
                             .unwrap();
                         let id_table = id_table_clone.write().await;
-                        let name_table = name_table_clone.write().await.clone();
+                        let name_table = name_table_clone.write().await;
                         Self::process_message(&mut message, &id_table, name_table).await
                     };
 
@@ -152,7 +153,7 @@ impl Server {
     async fn process_message(
         message: &mut Message,
         id_table: &BiMap<u16, String>,
-        name_table: HashMap<u16, String>,
+        name_table: &mut HashMap<u16, String>,
     ) -> Message {
         match message.metadata.message_type {
             MessageType::File | MessageType::Text => {
@@ -172,6 +173,13 @@ impl Server {
                     clients.push((id, name));
                 }
                 Message::new_list_clients(message.metadata.sender_id, clients)
+            }
+            MessageType::SetName => {
+                let client_id = message.metadata.sender_id;
+                let client_name = String::from_utf8_lossy(&message.content).to_string();
+                name_table.insert(client_id, client_name.clone());
+                println!("Clientes conectados: {}", content);
+                message.clone()
             }
         }
     }
