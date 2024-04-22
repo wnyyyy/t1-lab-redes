@@ -82,7 +82,7 @@ impl Server {
                 let mut tcp_clients_write = tcp_clients_clone.write().await;
                 tcp_clients_write.insert(addr.clone(), Arc::new(Mutex::new(stream)));
             }
-            println!("Nova conexão TCP: {0} - ID {1}", addr, 0);
+            println!("Nova conexão TCP: {0} - ID {1}", addr, id);
 
             tokio::spawn(async move {
                 loop {
