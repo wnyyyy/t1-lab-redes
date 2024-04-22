@@ -22,6 +22,11 @@ impl Client {
         self.stream.write_all(&message_bytes).await
     }
 
+    pub async fn send_raw(&mut self, message: Message) -> io::Result<()> {
+        let message_bytes = message.serialize().await;
+        self.stream.write_all(&message_bytes).await
+    }
+
     pub async fn receive(&mut self) -> Result<String, Box<dyn Error>> {
         let mut buffer = vec![0; 1024];
         let n = self.stream.read(&mut buffer).await?;

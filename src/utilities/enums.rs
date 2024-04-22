@@ -7,6 +7,7 @@ pub enum MessageType {
     File = 1,
     ListClients = 2,
     SetName = 3,
+    Disconnect = 4,
 }
 impl From<MessageType> for u8 {
     fn from(message_type: MessageType) -> Self {
@@ -22,6 +23,7 @@ impl TryFrom<u8> for MessageType {
             1 => Ok(MessageType::File),
             2 => Ok(MessageType::ListClients),
             3 => Ok(MessageType::SetName),
+            4 => Ok(MessageType::Disconnect),
             _ => Err("Tipo de mensagem inválido".to_string()),
         }
     }

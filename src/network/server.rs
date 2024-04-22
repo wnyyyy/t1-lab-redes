@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::ops::Deref;
 use std::sync::Arc;
 
 use bimap::BiMap;
@@ -17,7 +15,6 @@ use crate::utilities::enums::MessageType;
 #[derive(Debug, Clone)]
 pub struct Server {
     tcp_clients: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
-    udp_clients: Arc<RwLock<HashMap<String, SocketAddr>>>,
     id_table: Arc<RwLock<BiMap<u16, String>>>,
     name_table: Arc<RwLock<HashMap<u16, String>>>,
 }
@@ -26,7 +23,6 @@ impl Server {
     pub fn new() -> Self {
         Server {
             tcp_clients: Arc::new(RwLock::new(HashMap::new())),
-            udp_clients: Arc::new(RwLock::new(HashMap::new())),
             id_table: Arc::new(RwLock::new(BiMap::new())),
             name_table: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -42,17 +38,19 @@ impl Server {
 
         println!("Servidor executando TCP na porta 8080 e UDP porta 8081");
 
-        let udp_clients = self.udp_clients.clone();
         let tcp_clients = self.tcp_clients.clone();
         let id_table = self.id_table.clone();
         let name_table = self.name_table.clone();
 
         let tcp_task = task::spawn(async move {
-            Self::listen_tcp(tcp_listener, tcp_clients, id_table, name_table).await;
+            Self::listen_tcp(tcp_listener, tcp_clients, id_table.clone(), name_table.clone()).await;
         });
 
+        let id_table = self.id_table.clone();
+        let name_table = self.name_table.clone();
+
         let udp_task = task::spawn(async move {
-            Self::listen_udp(udp_socket).await;
+            Self::listen_udp(udp_socket, id_table.clone(), name_table.clone()).await;
         });
 
         let _ = tokio::join!(tcp_task, udp_task);
@@ -110,9 +108,9 @@ impl Server {
                             .await
                             .get_by_right(&sender_addr)
                             .unwrap();
-                        let id_table = id_table_clone.write().await;
+                        let mut id_table = id_table_clone.write().await;
                         let mut name_table = name_table_clone.write().await;
-                        Self::process_message(&mut message, &id_table, &mut name_table).await
+                        Self::process_message(&mut message, &mut id_table, &mut name_table).await
                     };
 
                     let dest_client_addr = {
@@ -152,7 +150,7 @@ impl Server {
 
     async fn process_message(
         message: &mut Message,
-        id_table: &BiMap<u16, String>,
+        id_table: &mut BiMap<u16, String>,
         name_table: &mut HashMap<u16, String>,
     ) -> Message {
         match message.metadata.message_type {
@@ -185,6 +183,13 @@ impl Server {
                 let message = Message::new_set_name(client_id, success);
                 message.clone()
             }
+            MessageType::Disconnect => {
+                let client_id = message.metadata.sender_id;
+                name_table.remove(&client_id);
+                id_table.remove_by_left(&client_id);
+                println!("Cliente ID {0} desconectado", client_id);
+                message.clone()
+            }
         }
     }
 
@@ -196,7 +201,9 @@ impl Server {
         client_list
     }
 
-    async fn listen_udp(socket: UdpSocket) {
+    async fn listen_udp(socket: UdpSocket,
+        id_table: Arc<RwLock<BiMap<u16, String>>>,
+        name_table: Arc<RwLock<HashMap<u16, String>>>,) {
         let mut buf = [0; 1024];
         loop {
             let (len, addr) = match socket.recv_from(&mut buf).await {
@@ -206,11 +213,19 @@ impl Server {
                     continue;
                 }
             };
-
-            println!("Recebendo dados de {}: {:?}", addr, &buf[..len]);
-            if let Err(e) = socket.send_to(&buf[..len], &addr).await {
-                eprintln!("Falha ao receber dados: {}", e);
-            }
+            let addr_str = addr.to_string();
+            let id = {
+                let id_table_read = id_table.read().await;
+                match id_table_read.get_by_right(&addr_str) {
+                    Some(&id) => id,
+                    None => {
+                        drop(id_table_read);
+                        let new_id = Self::assign_id(addr_str.clone(), id_table.clone()).await;
+                        new_id
+                    }
+                }
+            };
+            let mut id_table_write = id_table.write().await;
         }
     }
 
