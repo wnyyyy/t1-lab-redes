@@ -24,7 +24,8 @@ mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou
 File = 2 - Envia arquivo em binário. Conteúdo da mensagem possui os dados a serem enviados. // Servidor responde com uma
 mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou 8, Success.
 
-ListClients = 3 - Solicita uma mensagem do servidor contendo json que lista os clients conectados, seus ids e nomes
+ListClients = 3 - (Somente Header) Solicita uma mensagem do servidor contendo json que lista os clients conectados, seus
+ids e nomes
 atribuidos. // Servidor responde com uma mensagem tipo 8, Success, contendo um json com as informações.
 
 SetName = 4 - Faz uma requisição ao servidor para alterar o nome do client. // Servidor responde com uma mensagem tipo
@@ -33,7 +34,8 @@ SetName = 4 - Faz uma requisição ao servidor para alterar o nome do client. //
 Broadcast = 5 - Envia uma mensagem para todos os clients conectados. Conteúdo da mensagem possui o texto a ser
 enviado. // Servidor responde com uma mensagem tipo 8, Success.
 
-Disconnect = 6 - Solicita ao servidor para desconectar o client. // Servidor responde com uma mensagem tipo 8, Success.
+Disconnect = 6 - (Somente Header) Solicita ao servidor para desconectar o client. // Servidor responde com uma mensagem
+tipo 8, Success.
 
 Error = 7 - Mensagem enviada pelo servidor para retornar um erro. Conteúdo da mensagem possui o motivo do erro.
 
