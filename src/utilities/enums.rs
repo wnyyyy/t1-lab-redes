@@ -1,13 +1,14 @@
 use std::convert::TryFrom;
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MessageType {
     Text = 0,
     File = 1,
     ListClients = 2,
     SetName = 3,
     Disconnect = 4,
+    Broadcast = 5,
 }
 impl From<MessageType> for u8 {
     fn from(message_type: MessageType) -> Self {
@@ -24,6 +25,7 @@ impl TryFrom<u8> for MessageType {
             2 => Ok(MessageType::ListClients),
             3 => Ok(MessageType::SetName),
             4 => Ok(MessageType::Disconnect),
+            5 => Ok(MessageType::Broadcast),
             _ => Err("Tipo de mensagem inválido".to_string()),
         }
     }

@@ -138,6 +138,24 @@ impl Server {
                             }
                         }
                     };
+                    if message.metadata.message_type == MessageType::Broadcast {
+                        let mut tcp_clients_read = tcp_clients_clone.read().await;
+                        for (client_addr, client_stream) in tcp_clients_read.iter() {
+                            if client_addr == &addr {
+                                continue;
+                            }
+                            let mut stream = client_stream.lock().await;
+                            if let Err(e) = stream.write_all(&message.content).await {
+                                eprintln!("Erro ao enviar mensagem: {}", e);
+                                continue;
+                            }
+                            println!(
+                                "Mensagem enviada para Client: {0} - ID {1}",
+                                client_addr, message.metadata.receiver_id
+                            );
+                        }
+                        continue;
+                    }
                     let mut dest_client_stream = dest_client.lock().await;
                     if let Err(e) = dest_client_stream.write_all(&message.content).await {
                         eprintln!("Erro ao enviar mensagem: {}", e);
@@ -194,6 +212,11 @@ impl Server {
                 name_table.remove(&client_id);
                 id_table.remove_by_left(&client_id);
                 println!("Cliente ID {0} desconectado", client_id);
+                message.clone()
+            }
+            MessageType::Broadcast => {
+                let content = String::from_utf8_lossy(&message.content);
+                println!("Mensagem de broadcast: {}", content);
                 message.clone()
             }
         }
