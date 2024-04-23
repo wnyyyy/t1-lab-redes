@@ -1,63 +1,122 @@
-use std::env;
+use std::{env, io};
+use std::collections::HashMap;
 use std::io::stdin;
+use std::sync::Arc;
+use std::time::Duration;
+
+use bimap::BiMap;
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
+use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::time;
+use tui::{Frame, Terminal};
+use tui::backend::{Backend, CrosstermBackend};
+use tui::layout::{Constraint, Direction, Layout};
+use tui::widgets::{Block, Borders, List, ListItem};
 
 use t1_lab_redes::config::{HOST_ADDRESS, TCP_PORT};
-use t1_lab_redes::models::message::Message;
-use t1_lab_redes::models::metadata::MsgMetadata;
-use t1_lab_redes::network::client;
-use t1_lab_redes::network::{client::Client, server::Server};
-use t1_lab_redes::utilities::enums::MessageType;
+use t1_lab_redes::network::client::Client;
+use t1_lab_redes::network::server::Server;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     match args.get(1).map(String::as_str) {
         Some("server") => {
+            enable_raw_mode()?;
+            let mut stdout = io::stdout();
+            execute!(stdout, EnterAlternateScreen)?;
             let server = Server::new();
-            server.start().await;
+            let backend = CrosstermBackend::new(stdout);
+            let mut terminal = Terminal::new(backend)?;
+            let id_table = server.id_table.clone();
+            let name_table = server.name_table.clone();
+            tokio::spawn(async move {
+                server.start().await;
+            });
+            let ui_result = draw_server_ui(&mut terminal, id_table, name_table).await;
+            disable_raw_mode()?;
+            execute!(io::stdout(), LeaveAlternateScreen)?;
+
+            ui_result
         }
         Some("client") => {
+            let mut client = Client::connect_tcp(format!("{}:{}", HOST_ADDRESS, TCP_PORT))
+                .await
+                .unwrap();
+            tokio::spawn(async move {
+                loop {
+                    let message = client.receive().await.unwrap();
+                    println!("{}", message);
+                }
+            });
+            print!("Mensagem");
+            let mut content_str = String::new();
+            stdin().read_line(&mut content_str).unwrap();
+            let content = content_str.trim().to_string().as_bytes().to_vec();
+            println!("id");
+            let mut id_str = String::new();
+            stdin().read_line(&mut id_str).unwrap();
             if let Some(arg) = args.get(2) {
                 if arg == "udp" {
-                    loop {
-                        print!("Mensagem");
-                        let mut content_str = String::new();
-                        stdin().read_line(&mut content_str).unwrap();
-                        let content = content_str.trim().to_string().as_bytes().to_vec();
-                        println!("id");
-                        let mut id_str = String::new();
-                        stdin().read_line(&mut id_str).unwrap();
-                    }
-                }
-            }
-            else {
-                let addr = format!("{}:{}", HOST_ADDRESS, TCP_PORT);
-                let mut client = Client::connect(addr).await.unwrap();
-                loop {
-                    println!("Mensagem");
+                    print!("Mensagem");
                     let mut content_str = String::new();
                     stdin().read_line(&mut content_str).unwrap();
                     let content = content_str.trim().to_string().as_bytes().to_vec();
                     println!("id");
                     let mut id_str = String::new();
-                    stdin().read_line(&mut id_str).unwrap();            
-                    let id = id_str.trim().parse().unwrap();
-                    println!("tipo");
-                    let mut tipo_str = String::new();
-                    stdin().read_line(&mut tipo_str).unwrap();
-                    let tipo = MessageType::try_from(tipo_str.trim().parse::<u8>().unwrap()).unwrap();
-                    let timestamp = chrono::Utc::now();
-                    let metadata = MsgMetadata::new(id, id, timestamp, tipo, content.len() as u64, None);
-                    let message = Message::new(metadata, content);
-                    client.send_raw(message).await.unwrap();
-                    let response = client.receive().await.unwrap();
-                    println!("Mensagem recebida: {}", response);
+                    stdin().read_line(&mut id_str).unwrap();
                 }
-            }            
+            }
+            Err(Box::try_from(io::Error::new(io::ErrorKind::Other, "Erro")).unwrap())
         }
         _ => {
-            eprintln!("Usage: program [server|client]");
+            disable_raw_mode()?;
+            execute!(io::stdout(), LeaveAlternateScreen)?;
+            Err(Box::try_from(io::Error::new(io::ErrorKind::Other, "Erro")).unwrap())
         }
     }
+}
+
+async fn draw_server_ui<B: Backend>(
+    terminal: &mut Terminal<B>,
+    id_table: Arc<RwLock<BiMap<u16, String>>>,
+    name_table: Arc<RwLock<HashMap<u16, String>>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    loop {
+        let id_table = id_table.write().await;
+        let name_table = name_table.write().await;
+        terminal.draw(|f| {
+            render_clients(f, id_table, name_table);
+        })?;
+        time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
+fn render_clients<B: Backend>(
+    f: &mut Frame<B>,
+    id_table: RwLockWriteGuard<BiMap<u16, String>>,
+    name_table: RwLockWriteGuard<HashMap<u16, String>>,
+) {
+    let mut items: Vec<ListItem> = Vec::new();
+    for (id, addr) in id_table.iter() {
+        let name = match name_table.get(id) {
+            Some(name) => name,
+            None => "Sem nome",
+        };
+        let item = ListItem::new(format!("Client ID:{0}\n\"{1}\" - {2}", id, name, addr));
+        items.push(item);
+    }
+    let client_list =
+        List::new(items).block(Block::default().title("Clients").borders(Borders::ALL));
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Percentage(100)].as_ref())
+        .split(f.size());
+
+    f.render_widget(client_list, chunks[0]);
 }

@@ -14,9 +14,10 @@ use crate::utilities::enums::MessageType;
 
 #[derive(Debug, Clone)]
 pub struct Server {
-    tcp_clients: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
-    id_table: Arc<RwLock<BiMap<u16, String>>>,
-    name_table: Arc<RwLock<HashMap<u16, String>>>,
+    pub tcp_clients: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
+    pub id_table: Arc<RwLock<BiMap<u16, String>>>,
+    polling_table: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
+    pub name_table: Arc<RwLock<HashMap<u16, String>>>,
     udp_id_map: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
     udp_data_map: Arc<RwLock<HashMap<u16, Vec<Message>>>>,
 }
@@ -26,6 +27,7 @@ impl Server {
         Server {
             tcp_clients: Arc::new(RwLock::new(HashMap::new())),
             id_table: Arc::new(RwLock::new(BiMap::new())),
+            polling_table: Arc::new(RwLock::new(HashMap::new())),
             name_table: Arc::new(RwLock::new(HashMap::new())),
             udp_id_map: Arc::new(RwLock::new(HashMap::new())),
             udp_data_map: Arc::new(RwLock::new(HashMap::new())),
