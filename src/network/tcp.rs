@@ -8,14 +8,12 @@ use crate::models::metadata::MsgMetadata;
 pub async fn receive(stream: &mut TcpStream) -> Result<Message, String> {
     let mut metadata_buffer = vec![0u8; METADATA_BYTES];
     if stream.read_exact(&mut metadata_buffer).await.is_ok() {
-        println!("Lendo metadata...");
         let metadata = match MsgMetadata::deserialize(&metadata_buffer, false) {
             Ok(meta) => meta,
             Err(e) => {
                 return Err(format!("Metadata inválida: \n{0}", e));
             }
         };
-        println!("Metadata válida: \n{:?}\n", metadata);
 
         let message_length = metadata.message_length as usize;
         let mut message_buffer = vec![0u8; message_length];

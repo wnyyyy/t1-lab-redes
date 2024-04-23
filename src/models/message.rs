@@ -1,5 +1,3 @@
-use chrono::Utc;
-
 use crate::models::metadata::MsgMetadata;
 use crate::utilities::enums::MessageType;
 
@@ -14,16 +12,21 @@ impl Message {
         Message { metadata, content }
     }
 
-    pub fn new_text(receiver_id: u16, content: String, udp_id: Option<u16>) -> Message {
+    pub fn new_text(
+        key: u16,
+        receiver_id: u16,
+        content: String,
+        udp_id: Option<u16>,
+        udp_seq: Option<u16>,
+    ) -> Message {
         let content_bytes = content.as_bytes().to_vec();
-        let timestamp = Utc::now();
         let metadata = MsgMetadata::new(
-            0,
+            key,
             receiver_id,
-            timestamp,
             MessageType::Text,
             content_bytes.len() as u64,
             udp_id,
+            udp_seq,
         );
         Message {
             metadata,
@@ -31,21 +34,46 @@ impl Message {
         }
     }
 
-    pub fn new_list_clients(
-        sender_id: u16,
+    pub fn new_connection_request(key: u16, name: String) -> Message {
+        let content_bytes = name.as_bytes().to_vec();
+        let metadata = MsgMetadata::new(
+            key,
+            0,
+            MessageType::Connection,
+            content_bytes.len() as u64,
+            None,
+            None,
+        );
+        Message {
+            metadata,
+            content: content_bytes,
+        }
+    }
+
+    pub fn new_list_clients_request(key: u16) -> Message {
+        let metadata = MsgMetadata::new(key, 0, MessageType::ListClients, 0, None, None);
+        Message {
+            metadata,
+            content: Vec::new(),
+        }
+    }
+
+    pub fn new_list_clients_response(
+        key: u16,
+        receiver_id: u16,
         clients: Vec<(u16, String)>,
         udp_id: Option<u16>,
+        udp_seq: Option<u16>,
     ) -> Message {
-        let timestamp = Utc::now();
         let content_json = serde_json::to_string(&clients).unwrap();
         let content_bytes = content_json.as_bytes().to_vec();
         let metadata = MsgMetadata::new(
-            sender_id,
-            sender_id,
-            timestamp,
-            MessageType::ListClients,
+            key,
+            receiver_id,
+            MessageType::Success,
             content_bytes.len() as u64,
             udp_id,
+            udp_seq,
         );
         Message {
             metadata,
@@ -53,15 +81,20 @@ impl Message {
         }
     }
 
-    pub fn new_set_name_request(name: String, udp_id: Option<u16>) -> Message {
+    pub fn new_set_name_request(
+        key: u16,
+        name: String,
+        udp_id: Option<u16>,
+        udp_seq: Option<u16>,
+    ) -> Message {
         let content_bytes = name.as_bytes().to_vec();
         let metadata = MsgMetadata::new(
+            key,
             0,
-            0,
-            Utc::now(),
             MessageType::SetName,
             content_bytes.len() as u64,
             udp_id,
+            udp_seq,
         );
         Message {
             metadata,
@@ -69,20 +102,22 @@ impl Message {
         }
     }
 
-    pub fn new_set_name_response(sender_id: u16, success: bool, udp_id: Option<u16>) -> Message {
-        let timestamp = Utc::now();
-        let content_bytes = success.to_string().as_bytes().to_vec();
+    pub fn new_generic_response(key: u16, receiver_id: u16, success: bool) -> Message {
         let metadata = MsgMetadata::new(
-            sender_id,
-            sender_id,
-            timestamp,
-            MessageType::SetName,
-            content_bytes.len() as u64,
-            udp_id,
+            key,
+            receiver_id,
+            if success {
+                MessageType::Success
+            } else {
+                MessageType::Error
+            },
+            0,
+            None,
+            None,
         );
         Message {
             metadata,
-            content: content_bytes,
+            content: Vec::new(),
         }
     }
 
@@ -108,5 +143,9 @@ impl Message {
 
     pub fn is_complete(&self) -> bool {
         self.metadata.is_complete(self.content.len() as u64)
+    }
+
+    pub fn generate_key() -> u16 {
+        rand::random::<u16>()
     }
 }

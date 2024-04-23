@@ -1,6 +1,6 @@
 use std::{env, io};
 use std::collections::HashMap;
-use std::io::stdin;
+use std::io::{BufRead, stdin};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,16 +9,18 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::io::AsyncBufReadExt;
+use tokio::sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio::time;
 use tui::{Frame, Terminal};
 use tui::backend::{Backend, CrosstermBackend};
 use tui::layout::{Constraint, Direction, Layout};
 use tui::widgets::{Block, Borders, List, ListItem};
 
-use t1_lab_redes::config::{HOST_ADDRESS, TCP_PORT};
 use t1_lab_redes::network::client::Client;
 use t1_lab_redes::network::server::Server;
+use t1_lab_redes::network::tcp_client::TcpClient;
+use t1_lab_redes::utilities::enums::MessageType;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,45 +36,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut terminal = Terminal::new(backend)?;
             let id_table = server.id_table.clone();
             let name_table = server.name_table.clone();
-            let msg = server.log.clone();
+            let logs = server.log.clone();
             tokio::spawn(async move {
                 server.start().await;
             });
-            let ui_result = draw_server_ui(&mut terminal, msg, id_table, name_table).await;
+            let ui_result = draw_server_ui(&mut terminal, id_table, name_table, logs).await;
             disable_raw_mode()?;
             execute!(io::stdout(), LeaveAlternateScreen)?;
 
             ui_result
         }
         Some("client") => {
-            let mut client = Client::connect_tcp(format!("{}:{}", HOST_ADDRESS, TCP_PORT))
-                .await
-                .unwrap();
-            tokio::spawn(async move {
-                loop {
-                    let message = client.receive().await.unwrap();
-                    println!("{}", message);
-                }
-            });
-            print!("Mensagem");
-            let mut content_str = String::new();
-            stdin().read_line(&mut content_str).unwrap();
-            let content = content_str.trim().to_string().as_bytes().to_vec();
-            println!("id");
-            let mut id_str = String::new();
-            stdin().read_line(&mut id_str).unwrap();
-            if let Some(arg) = args.get(2) {
-                if arg == "udp" {
-                    print!("Mensagem");
-                    let mut content_str = String::new();
-                    stdin().read_line(&mut content_str).unwrap();
-                    let content = content_str.trim().to_string().as_bytes().to_vec();
-                    println!("id");
-                    let mut id_str = String::new();
-                    stdin().read_line(&mut id_str).unwrap();
-                }
-            }
-            Err(Box::try_from(io::Error::new(io::ErrorKind::Other, "Erro")).unwrap())
+            let udp = if let Some(arg) = args.get(2) {
+                arg == "udp"
+            } else {
+                false
+            };
+            let client = if udp {
+                TcpClient::new("Client UDP".to_string()).await.unwrap()
+            } else {
+                TcpClient::new("Client TCP".to_string()).await.unwrap()
+            };
+            let client_arc = Arc::new(Mutex::new(client));
+            let sender = {
+                let client = Arc::clone(&client_arc);
+                tokio::spawn(async move {
+                    let mut input = String::new();
+                    let mut stdin = stdin();
+                    println!("\nComandos disponiveis:\nmsg <id destino> <conteúdo>\n\n");
+                    while stdin.read_line(&mut input)? > 0 {
+                        let mut client = client.lock().await;
+                        let (message_type, destination_id, content) =
+                            client.create_command(input.clone());
+                        match message_type {
+                            MessageType::SetName => {
+                                client.set_name(content).await.unwrap();
+                            }
+                            MessageType::Text => {
+                                println!("Enviando mensagem para {}\n", destination_id);
+                                client.send_text(content, destination_id).await.unwrap();
+                            }
+                            _ => {}
+                        }
+                        input.clear();
+                    }
+                    Ok::<(), io::Error>(())
+                })
+            };
+
+            let receiver = {
+                let client = Arc::clone(&client_arc);
+                tokio::spawn(async move {
+                    loop {
+                        let mut client = client.lock().await;
+                        let message = client.listen().await.unwrap();
+                        println!(
+                            "\nMensagem Recebida de {}:\n{}\n",
+                            message.metadata.receiver_id,
+                            String::from_utf8(message.content).unwrap()
+                        );
+                    }
+                })
+            };
+
+            let _ = tokio::try_join!(sender, receiver);
+            Ok(())
         }
         _ => {
             disable_raw_mode()?;
@@ -84,16 +112,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn draw_server_ui<B: Backend>(
     terminal: &mut Terminal<B>,
-    msg: Arc<RwLock<String>>,
     id_table: Arc<RwLock<BiMap<u16, String>>>,
     name_table: Arc<RwLock<HashMap<u16, String>>>,
+    logs: Arc<RwLock<String>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let id_table = id_table.write().await;
         let name_table = name_table.write().await;
-        let msg = msg.read().await;
+        let logs = logs.read().await;
         terminal.draw(|f| {
-            render_clients(f, msg.as_str(), id_table, name_table);
+            render_clients(f, id_table, name_table, logs);
         })?;
         time::sleep(Duration::from_millis(500)).await;
     }
@@ -101,12 +129,11 @@ async fn draw_server_ui<B: Backend>(
 
 fn render_clients<B: Backend>(
     f: &mut Frame<B>,
-    msg: &str,
     id_table: RwLockWriteGuard<BiMap<u16, String>>,
     name_table: RwLockWriteGuard<HashMap<u16, String>>,
+    logs: RwLockReadGuard<String>,
 ) {
     let mut items: Vec<ListItem> = Vec::new();
-    items.push(ListItem::new(msg));
     items.push(ListItem::new("\n"));
     for (id, addr) in id_table.iter() {
         let name = match name_table.get(id) {
@@ -118,11 +145,17 @@ fn render_clients<B: Backend>(
     }
     let client_list =
         List::new(items).block(Block::default().title("Server").borders(Borders::ALL));
+
+    let lines = logs.lines();
+    let log_items: Vec<ListItem> = lines.map(|log| ListItem::new(log.to_string())).collect();
+    let log_list = List::new(log_items).block(Block::default().title("Logs").borders(Borders::ALL));
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([Constraint::Percentage(100)].as_ref())
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(f.size());
 
     f.render_widget(client_list, chunks[0]);
+    f.render_widget(log_list, chunks[1]);
 }

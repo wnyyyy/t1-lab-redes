@@ -19,7 +19,9 @@ client. // Servidor responde com uma mensagem tipo 7, Error, contendo motivo da 
 client.
 
 Text = 1 - Envia mensagem de texto. Conteúdo da mensagem possui o texto a ser enviado. // Servidor responde com uma
-mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou 8, Success.
+mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou 8, Success. Quem recebe a mensagem,
+recebe do servidor uma mensagem deste tipo com o conteúdo da mensagem, mas com receiver_id sendo sender_id (id do
+remetente).
 
 File = 2 - Envia arquivo em binário. Conteúdo da mensagem possui os dados a serem enviados. // Servidor responde com uma
 mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou 8, Success.
@@ -41,3 +43,7 @@ Error = 7 - Mensagem enviada pelo servidor para retornar um erro. Conteúdo da m
 
 Success = 8 - Mensagem enviada pelo servidor para retornar sucesso. Conteúdo da mensagem possui o id do client, ou um
 json
+
+Ping = 9 - (Somente Header) Mensagem enviada periodicamente pelo servidor para verificar se o client está ativo. Client
+deve responder com outro ping.
+
