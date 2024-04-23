@@ -107,7 +107,7 @@ fn render_clients<B: Backend>(
             Some(name) => name,
             None => "Sem nome",
         };
-        let item = ListItem::new(format!("Client ID:{0}\n\"{1}\" - {2}", id, name, addr));
+        let item = ListItem::new(format!("Client ID:{0}\n\"{1}\" - {2}\n", id, name, addr));
         items.push(item);
     }
     let client_list =
