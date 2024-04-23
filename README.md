@@ -10,6 +10,8 @@ Formato das mensagens (em 8 bits)
 
 [13, 14] -> ID mensagem UDP (usado para construir mensagens por UDP)
 
+[15, 16] -> Sequência do pacote UDP (usado para construir mensagens por UDP)
+
 Tipos de mensagem
 
 Connection = 0 - Requisição feita pelo client para se conectar ao servidor. Conteúdo da mensagem pode possuir o nome do
