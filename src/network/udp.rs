@@ -1,6 +1,10 @@
 use crate::models::message::Message;
 
-pub async fn build_udp_message(bytes: Vec<u8>, owned_ids: Vec<u16>, current_packets: &mut Vec<Message> ) -> Option<Message> {
+pub async fn build_udp_message(
+    bytes: Vec<u8>,
+    owned_ids: Vec<u16>,
+    current_packets: &mut Vec<Message>,
+) -> Option<Message> {
     let message = Message::new_udp_packet(bytes);
     if let Err(e) = message {
         eprintln!("Erro processando pacote UDP:\n{:?}", e);
@@ -11,7 +15,10 @@ pub async fn build_udp_message(bytes: Vec<u8>, owned_ids: Vec<u16>, current_pack
         eprintln!("Mensagem não pertence ao remetente. Ignorando...");
         return None;
     }
-    if current_packets.iter().any(|x| x.metadata.timestamp == message.metadata.timestamp) {
+    if current_packets
+        .iter()
+        .any(|x| x.metadata.timestamp == message.metadata.timestamp)
+    {
         eprintln!("Pacote UDP já recebido. Ignorando...");
         return None;
     }
@@ -28,7 +35,6 @@ pub async fn build_udp_message(bytes: Vec<u8>, owned_ids: Vec<u16>, current_pack
     }
     println!("Erro ao reconstruir mensagem.");
     return None;
-
 }
 
 fn rebuild_message(current_packets: &mut Vec<Message>, udp_id: u16) -> Option<Message> {
@@ -38,9 +44,6 @@ fn rebuild_message(current_packets: &mut Vec<Message>, udp_id: u16) -> Option<Me
     for packet in current_packets {
         content.extend(&packet.content);
     }
-    let message = Message {
-        metadata,
-        content,
-    };
+    let message = Message { metadata, content };
     Some(message)
 }

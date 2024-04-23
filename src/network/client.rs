@@ -7,13 +7,15 @@ use tokio::net::TcpStream;
 use crate::models::message::Message;
 
 pub struct Client {
-    stream: TcpStream,
+    stream: Option<TcpStream>,
 }
 
 impl Client {
-    pub async fn connect(addr: String) -> Result<Self, Box<dyn Error>> {
+    pub async fn connect_tcp(addr: String) -> Result<Self, Box<dyn Error>> {
         let stream = TcpStream::connect(addr).await?;
-        Ok(Client { stream })
+        Ok(Client {
+            stream: Some(stream),
+        })
     }
 
     pub async fn send_text(&mut self, content: String, destination_id: u16) -> io::Result<()> {

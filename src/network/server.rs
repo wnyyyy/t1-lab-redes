@@ -47,7 +47,13 @@ impl Server {
         let name_table = self.name_table.clone();
 
         let tcp_task = task::spawn(async move {
-            Self::listen_tcp(tcp_listener, tcp_clients, id_table.clone(), name_table.clone()).await;
+            Self::listen_tcp(
+                tcp_listener,
+                tcp_clients,
+                id_table.clone(),
+                name_table.clone(),
+            )
+            .await;
         });
 
         let id_table = self.id_table.clone();
@@ -68,6 +74,9 @@ impl Server {
         name_table: Arc<RwLock<HashMap<u16, String>>>,
     ) {
         loop {
+            let tcp_clients_clone = tcp_clients.clone();
+            let name_table_clone = name_table.clone();
+            let id_table_clone = id_table.clone();
             println!("Aguardando conexão TCP...");
             let (stream, addr) = match listener.accept().await {
                 Ok((stream, addr)) => (stream, addr),
@@ -77,12 +86,9 @@ impl Server {
                 }
             };
             let addr = addr.to_string();
-            let tcp_clients_clone = tcp_clients.clone();
-            let name_table_clone = name_table.clone();
-            let id_table_clone = id_table.clone();
             let id = Self::assign_id(addr.clone(), id_table.clone()).await;
             {
-                let mut tcp_clients_write = tcp_clients_clone.write().await;
+                let mut tcp_clients_write = tcp_clients.write().await;
                 tcp_clients_write.insert(addr.clone(), Arc::new(Mutex::new(stream)));
             }
             println!("Nova conexão TCP: {0} - ID {1}", addr, id);
@@ -115,7 +121,8 @@ impl Server {
                             .unwrap();
                         let mut id_table = id_table_clone.write().await;
                         let mut name_table = name_table_clone.write().await;
-                        Self::process_message(&mut message, &mut id_table, &mut name_table, None).await
+                        Self::process_message(&mut message, &mut id_table, &mut name_table, None)
+                            .await
                     };
 
                     let dest_client_addr = {
@@ -139,7 +146,7 @@ impl Server {
                         }
                     };
                     if message.metadata.message_type == MessageType::Broadcast {
-                        let mut tcp_clients_read = tcp_clients_clone.read().await;
+                        let tcp_clients_read = tcp_clients_clone.read().await;
                         for (client_addr, client_stream) in tcp_clients_read.iter() {
                             if client_addr == &addr {
                                 continue;
@@ -222,7 +229,8 @@ impl Server {
         }
     }
 
-    async fn listen_udp(socket: UdpSocket,
+    async fn listen_udp(
+        socket: UdpSocket,
         id_table: Arc<RwLock<BiMap<u16, String>>>,
         udp_id_map: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
         udp_data_map: Arc<RwLock<HashMap<u16, Vec<Message>>>>,
@@ -243,8 +251,7 @@ impl Server {
                     Some(&id) => id,
                     None => {
                         drop(id_table_read);
-                        let new_id = Self::assign_id(addr_str.clone(), id_table.clone()).await;
-                        new_id
+                        Self::assign_id(addr_str.clone(), id_table.clone()).await
                     }
                 }
             };

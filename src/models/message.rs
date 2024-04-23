@@ -1,5 +1,3 @@
-use std::fs::Metadata;
-
 use chrono::Utc;
 
 use crate::models::metadata::MsgMetadata;
@@ -33,7 +31,11 @@ impl Message {
         }
     }
 
-    pub fn new_list_clients(sender_id: u16, clients: Vec<(u16, String)>, udp_id: Option<u16>) -> Message {
+    pub fn new_list_clients(
+        sender_id: u16,
+        clients: Vec<(u16, String)>,
+        udp_id: Option<u16>,
+    ) -> Message {
         let timestamp = Utc::now();
         let content_json = serde_json::to_string(&clients).unwrap();
         let content_bytes = content_json.as_bytes().to_vec();

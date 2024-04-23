@@ -13,7 +13,7 @@ pub struct MsgMetadata {
     pub timestamp: DateTime<Utc>,
     pub message_type: MessageType,
     pub message_length: u64,
-    pub udp_id: Option<u16>
+    pub udp_id: Option<u16>,
 }
 
 impl MsgMetadata {
@@ -23,7 +23,7 @@ impl MsgMetadata {
         timestamp: DateTime<Utc>,
         message_type: MessageType,
         message_length: u64,
-        udp_id: Option<u16>,        
+        udp_id: Option<u16>,
     ) -> MsgMetadata {
         MsgMetadata {
             sender_id,
@@ -112,17 +112,12 @@ impl MsgMetadata {
                     timestamp,
                     message_type,
                     message_length,
-                    udp_id: None
-                })
+                    udp_id: None,
+                });
             }
             match data[21..23].try_into() {
                 Ok(bytes) => Some(u16::from_le_bytes(bytes)),
-                Err(_) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidData,
-                        "ID UDP inválido",
-                    ))
-                }
+                Err(_) => return Err(Error::new(ErrorKind::InvalidData, "ID UDP inválido")),
             }
         };
 
@@ -132,7 +127,7 @@ impl MsgMetadata {
             timestamp,
             message_type,
             message_length,
-            udp_id
+            udp_id,
         })
     }
 
