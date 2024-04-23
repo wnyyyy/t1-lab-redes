@@ -34,10 +34,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut terminal = Terminal::new(backend)?;
             let id_table = server.id_table.clone();
             let name_table = server.name_table.clone();
+            let msg = server.log.clone();
             tokio::spawn(async move {
                 server.start().await;
             });
-            let ui_result = draw_server_ui(&mut terminal, id_table, name_table).await;
+            let ui_result = draw_server_ui(&mut terminal, msg, id_table, name_table).await;
             disable_raw_mode()?;
             execute!(io::stdout(), LeaveAlternateScreen)?;
 
@@ -83,14 +84,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn draw_server_ui<B: Backend>(
     terminal: &mut Terminal<B>,
+    msg: Arc<RwLock<String>>,
     id_table: Arc<RwLock<BiMap<u16, String>>>,
     name_table: Arc<RwLock<HashMap<u16, String>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let id_table = id_table.write().await;
         let name_table = name_table.write().await;
+        let msg = msg.read().await;
         terminal.draw(|f| {
-            render_clients(f, id_table, name_table);
+            render_clients(f, msg.as_str(), id_table, name_table);
         })?;
         time::sleep(Duration::from_millis(500)).await;
     }
@@ -98,10 +101,13 @@ async fn draw_server_ui<B: Backend>(
 
 fn render_clients<B: Backend>(
     f: &mut Frame<B>,
+    msg: &str,
     id_table: RwLockWriteGuard<BiMap<u16, String>>,
     name_table: RwLockWriteGuard<HashMap<u16, String>>,
 ) {
     let mut items: Vec<ListItem> = Vec::new();
+    items.push(ListItem::new(msg));
+    items.push(ListItem::new("\n"));
     for (id, addr) in id_table.iter() {
         let name = match name_table.get(id) {
             Some(name) => name,
@@ -111,7 +117,7 @@ fn render_clients<B: Backend>(
         items.push(item);
     }
     let client_list =
-        List::new(items).block(Block::default().title("Clients").borders(Borders::ALL));
+        List::new(items).block(Block::default().title("Server").borders(Borders::ALL));
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)

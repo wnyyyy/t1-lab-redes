@@ -1,24 +1,39 @@
 Formato das mensagens (em 8 bits)
 
-[0, 1] -> sender_id
+[0, 1] -> key (Identificador atribuido pelo client para vincular a mensagem enviada a uma resposta do servidor)
 
 [2, 3] -> receiver_id
 
-[4, 11] -> timestamp
+4 -> message_type
 
-12 -> message_type
+[5, 12] -> message_length
 
-[13, 20] -> message_length
+[13, 14] -> ID mensagem UDP (usado para construir mensagens por UDP)
 
-[21, 22] -> ID mensagem UDP (usado para construir mensagens por UDP)
+Tipos de mensagem
 
+Connection = 0 - Requisição feita pelo client para se conectar ao servidor. Conteúdo da mensagem pode possuir o nome do
+client. // Servidor responde com uma mensagem tipo 7, Error, contendo motivo da falha; ou 8, Success, contendo o id do
+client.
 
-Tipos válidos
+Text = 1 - Envia mensagem de texto. Conteúdo da mensagem possui o texto a ser enviado. // Servidor responde com uma
+mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou 8, Success.
 
-Text = 0 - Envia mensagem de texto. Conteúdo da mensagem possui o texto a ser enviado.
+File = 2 - Envia arquivo em binário. Conteúdo da mensagem possui os dados a serem enviados. // Servidor responde com uma
+mensagem tipo 7, Error, contendo motivo da falha (eg, destinatário offline); ou 8, Success.
 
-File = 1 - Envia arquivo em binário. Conteúdo da mensagem possui os dados a serem enviados.
+ListClients = 3 - Solicita uma mensagem do servidor contendo json que lista os clients conectados, seus ids e nomes
+atribuidos. // Servidor responde com uma mensagem tipo 8, Success, contendo um json com as informações.
 
-ListClients = 2 - Solicita uma mensagem do servidor contendo json que lista os clients conectados, seus ids e nomes atribuidos.
+SetName = 4 - Faz uma requisição ao servidor para alterar o nome do client. // Servidor responde com uma mensagem tipo
+7, Error, contendo motivo da falha (eg, nome já existente); ou 8, Success.
 
-SetName = 3 - Faz uma requisição ao servidor para alterar o nome do client. O servidor retorna uma mensagem contendo 0 (Falha) ou 1 (Sucesso) para se trocou o nome ou não.
+Broadcast = 5 - Envia uma mensagem para todos os clients conectados. Conteúdo da mensagem possui o texto a ser
+enviado. // Servidor responde com uma mensagem tipo 8, Success.
+
+Disconnect = 6 - Solicita ao servidor para desconectar o client. // Servidor responde com uma mensagem tipo 8, Success.
+
+Error = 7 - Mensagem enviada pelo servidor para retornar um erro. Conteúdo da mensagem possui o motivo do erro.
+
+Success = 8 - Mensagem enviada pelo servidor para retornar sucesso. Conteúdo da mensagem possui o id do client, ou um
+json

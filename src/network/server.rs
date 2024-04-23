@@ -18,6 +18,7 @@ pub struct Server {
     pub id_table: Arc<RwLock<BiMap<u16, String>>>,
     polling_table: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
     pub name_table: Arc<RwLock<HashMap<u16, String>>>,
+    pub log: Arc<RwLock<String>>,
     udp_id_map: Arc<RwLock<HashMap<u16, Vec<u16>>>>,
     udp_data_map: Arc<RwLock<HashMap<u16, Vec<Message>>>>,
 }
@@ -31,6 +32,7 @@ impl Server {
             name_table: Arc::new(RwLock::new(HashMap::new())),
             udp_id_map: Arc::new(RwLock::new(HashMap::new())),
             udp_data_map: Arc::new(RwLock::new(HashMap::new())),
+            log: Arc::new(RwLock::new(String::new())),
         }
     }
 
@@ -42,14 +44,19 @@ impl Server {
             .await
             .unwrap();
 
-        println!("Servidor executando TCP na porta 8080 e UDP porta 8081");
+        self.log
+            .write()
+            .await
+            .push_str("Servidor executando TCP na porta 8080 e UDP porta 8081");
 
         let tcp_clients = self.tcp_clients.clone();
         let id_table = self.id_table.clone();
         let name_table = self.name_table.clone();
+        let log = self.log.clone();
 
         let tcp_task = task::spawn(async move {
             Self::listen_tcp(
+                log,
                 tcp_listener,
                 tcp_clients,
                 id_table.clone(),
@@ -70,16 +77,17 @@ impl Server {
     }
 
     async fn listen_tcp(
+        log: Arc<RwLock<String>>,
         listener: TcpListener,
         tcp_clients: Arc<RwLock<HashMap<String, Arc<Mutex<TcpStream>>>>>,
         id_table: Arc<RwLock<BiMap<u16, String>>>,
         name_table: Arc<RwLock<HashMap<u16, String>>>,
     ) {
         loop {
+            let curr_log = log.read().await.clone();
             let tcp_clients_clone = tcp_clients.clone();
             let name_table_clone = name_table.clone();
             let id_table_clone = id_table.clone();
-            println!("Aguardando conexão TCP...");
             let (stream, addr) = match listener.accept().await {
                 Ok((stream, addr)) => (stream, addr),
                 Err(e) => {
@@ -213,7 +221,7 @@ impl Server {
                     name_table.insert(client_id, client_name.clone());
                 }
                 println!("Clientes ID {0} - Novo nome: {1}", client_id, client_name);
-                let message = Message::new_set_name(client_id, success, udp_id);
+                let message = Message::new_set_name_response(client_id, success, udp_id);
                 message.clone()
             }
             MessageType::Disconnect => {

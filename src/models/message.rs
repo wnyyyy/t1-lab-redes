@@ -53,7 +53,23 @@ impl Message {
         }
     }
 
-    pub fn new_set_name(sender_id: u16, success: bool, udp_id: Option<u16>) -> Message {
+    pub fn new_set_name_request(name: String, udp_id: Option<u16>) -> Message {
+        let content_bytes = name.as_bytes().to_vec();
+        let metadata = MsgMetadata::new(
+            0,
+            0,
+            Utc::now(),
+            MessageType::SetName,
+            content_bytes.len() as u64,
+            udp_id,
+        );
+        Message {
+            metadata,
+            content: content_bytes,
+        }
+    }
+
+    pub fn new_set_name_response(sender_id: u16, success: bool, udp_id: Option<u16>) -> Message {
         let timestamp = Utc::now();
         let content_bytes = success.to_string().as_bytes().to_vec();
         let metadata = MsgMetadata::new(
