@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use tokio::stream;
 use tokio::sync::RwLock;
 
 use crate::config::{HOST_ADDRESS, TCP_PORT};
@@ -96,29 +97,36 @@ impl Client for TcpClient {
 impl TcpClient {
     pub async fn new(name: String) -> Result<Self, Box<dyn Error>> {
         let addr = format!("{}:{}", HOST_ADDRESS, TCP_PORT);
-        let mut stream = TcpStream::connect(addr).await?;
-        let connection_request =
-            Message::new_connection_request(Message::generate_key(), name.clone());
-        stream
-            .write_all(&connection_request.serialize().await)
-            .await?;
-        // let msg = loop {
-        //     let msg = match tcp::receive(&mut stream).await {
-        //         Ok(msg) => msg,
-        //         Err(_) => {
-        //             continue;
-        //         }
-        //     };
-        //     if msg.metadata.message_type == MessageType::Connection {
-        //         break msg;
-        //     }
-        // };
-        // if msg.metadata.message_type != MessageType::Connection {
-        //     return Err("Erro ao conectar".into());
-        // }
-        // let id = msg.metadata.receiver_id;
+        let stream = TcpStream::connect(addr).await?;
+        println!("Conexão encontranda!");
         let log = Arc::new(RwLock::new(String::new()));
         let stream = Arc::new(RwLock::new(stream));
+        let connection_request =
+            Message::new_connection_request(Message::generate_key(), name.clone());
+        let message_bytes = connection_request.serialize().await;
+        let stream_clone = stream.clone();
+        {
+            println!("Conectando...");
+            let mut stream_write = stream_clone.write().await;
+            stream_write.write_all(&message_bytes).await?;
+        }
+        let mut stream_write = stream_clone.write().await;
+        let msg = loop {
+            println!("Aguardando resposta do servidor...");
+            let msg = match tcp::receive(&mut stream_write).await {
+                Ok(msg) => msg,
+                Err(_) => {
+                    continue;
+                }
+            };
+            if msg.metadata.message_type == MessageType::Connection {
+                break msg;
+            }
+        };
+        if msg.metadata.message_type != MessageType::Connection {
+            return Err("Erro ao conectar".into());
+        }
+        let id = msg.metadata.receiver_id;
         println!("Conectado com sucesso!\nID: {}", 0);
         Ok(TcpClient {
             name,
